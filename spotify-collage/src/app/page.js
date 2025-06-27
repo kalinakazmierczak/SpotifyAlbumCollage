@@ -55,20 +55,17 @@ export default function Home() {
 
   if (!session) {
     return (
-      <main className="flex flex-col items-center justify-center h-screen text-center space-y-4 bg-black text-white">
-        <h1 className="font-serif text-6xl font-bold">Spindle</h1>
-        <h2 className="font-serif text-4xl" style={{ color: "#5C95FF" }}>
-          Spin your story.
-        </h2>
-
-        
-        <button
-          onClick={() => signIn("spotify")}
-          className="font-serif text-lg px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors duration-200 shadow-lg hover:shadow-xl active:scale-95 transform"
-        >
-          Login with Spotify
-        </button>
-      </main>
+      <div className="flex flex-col items-center relative">
+      <img src="/images/whitelogo.png" className="w-350" />
+      <img src="/images/motto.png" className="w-230 -mt-165" />
+      <button
+        onClick={() => signIn("spotify")}
+        className="mt-[-200px] font-serif text-lg px-4 py-2 text-black rounded-2xl hover:bg-green-600 transition-colors duration-200 shadow-lg hover:shadow-xl active:scale-95 transform"
+        style={{ backgroundColor: "#1ED760" }}
+      >
+        Login with Spotify
+      </button>
+      </div>
     );
   }
 
