@@ -60,6 +60,8 @@ export default function Home() {
         <h2 className="font-serif text-4xl" style={{ color: "#5C95FF" }}>
           Spin your story.
         </h2>
+
+        
         <button
           onClick={() => signIn("spotify")}
           className="font-serif text-lg px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors duration-200 shadow-lg hover:shadow-xl active:scale-95 transform"
@@ -119,8 +121,6 @@ export default function Home() {
           </div>
         </div>
 
-        
-
         {/* Buttons */}
         <div className="flex flex-col gap-2">
           <button
@@ -129,7 +129,6 @@ export default function Home() {
           >
             Sign Out
           </button>
-
         </div>
       </div>
 
@@ -143,6 +142,7 @@ export default function Home() {
             height: "960px",
             transform: "scale(0.9)",
             transformOrigin: "top center",
+            backgroundImage: "url('../../images/wood-texture.jpg')",
           }}
         >
           <div className="h-full w-full flex flex-col items-center justify-center p-12">
@@ -153,11 +153,10 @@ export default function Home() {
             ) : (
               <>
                 <div className="text-black text-center mb-8">
+                  <h3 className="text-3xl font-serif mb-2">SPINDLE</h3>
                   <h3 className="text-3xl font-serif mb-2">
-                    SPINDLE
-                  </h3>
-                  <h3 className="text-3xl font-serif mb-2">
-                    @{username}'s Top {contentType === "albums" ? "Albums" : "Songs"}
+                    @{username}'s Top{" "}
+                    {contentType === "albums" ? "Albums" : "Songs"}
                   </h3>
                   <p className="text-lg text-gray-600 font-serif">
                     {
@@ -175,11 +174,15 @@ export default function Home() {
 
                     const title = item.name;
                     const artist = item.artists?.[0]?.name;
+                    const song_link = item.external_urls;
 
                     return (
                       <div key={item.id} className="flex flex-col items-center">
                         <div
                           className="relative rounded-full overflow-hidden shadow-2xl hover:animate-spin shadow-3xl transition-all duration-300 hover:scale-105"
+                          onClick={() =>
+                            window.open(song_link.spotify, "_blank")
+                          }
                           style={{
                             width: "140px",
                             height: "140px",
@@ -191,7 +194,7 @@ export default function Home() {
                             <img
                               src={imageUrl}
                               alt={title}
-                              className="absolute top-1/2 left-1/2 rounded-full transform -translate-x-1/2 -translate-y-1/2 border-2 border-white shadow-lg"
+                              className="absolute top-1/2 left-1/2 rounded-full transform -translate-x-1/2 -translate-y-1/2 border-2 border-white shadow-lg "
                               style={{
                                 width: "90px",
                                 height: "90px",
