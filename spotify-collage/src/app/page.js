@@ -247,12 +247,15 @@ export default function Home() {
               {[...Array(9)].map((_, i) => (
                 <div
                   key={i}
-                  className="aspect-square rounded-full bg-gradient-to-br from-zinc-800 to-zinc-900"
+                  className="aspect-square rounded-full relative"
                   style={{
                     background: "repeating-radial-gradient(circle at center, #1a1a1a 0px, #1a1a1a 1px, #0f0f0f 1px, #0f0f0f 2px)",
                     opacity: 0.5 + (i % 3) * 0.15,
                   }}
-                />
+                >
+                  {/* Center hole */}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-zinc-900 rounded-full border border-zinc-700" />
+                </div>
               ))}
             </div>
             <p className="text-[11px] text-muted text-center mt-4">
@@ -404,7 +407,7 @@ export default function Home() {
 
                 return (
                   <div
-                    key={item.id}
+                    key={`${item.id}-${index}`}
                     className="flex flex-col items-center"
                   >
                     {/* Vinyl Record - circular container */}
@@ -425,6 +428,7 @@ export default function Home() {
                       {/* Album art center */}
                       {imageUrl && (
                         <img
+                          key={`img-${item.id}-${index}`}
                           src={imageUrl}
                           alt={title}
                           crossOrigin="anonymous"
