@@ -306,8 +306,9 @@ export default function Home() {
 
       <div className="max-w-5xl mx-auto">
         {/* Controls */}
-        <div className="flex flex-wrap items-center gap-3 mb-8">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col md:flex-row md:flex-wrap items-start md:items-center gap-3 mb-8">
+          {/* Time Period */}
+          <div className="flex items-center gap-2 w-full md:w-auto">
             {timePeriodOptions.map((option) => (
               <button
                 key={option.value}
@@ -319,9 +320,10 @@ export default function Home() {
             ))}
           </div>
 
-          <div className="w-px h-5 bg-zinc-800 mx-2" />
+          <div className="hidden md:block w-px h-5 bg-zinc-800 mx-2" />
 
-          <div className="flex items-center gap-2">
+          {/* Content Type */}
+          <div className="flex items-center gap-2 w-full md:w-auto">
             <button
               onClick={() => setContentType("tracks")}
               className={`chip ${contentType === "tracks" ? "active" : ""}`}
@@ -336,9 +338,10 @@ export default function Home() {
             </button>
           </div>
 
-          <div className="w-px h-5 bg-zinc-800 mx-2" />
+          <div className="hidden md:block w-px h-5 bg-zinc-800 mx-2" />
 
-          <div className="flex items-center gap-2">
+          {/* Grid Size */}
+          <div className="flex items-center gap-2 w-full md:w-auto">
             {gridOptions.map((option) => (
               <button
                 key={option.value}
@@ -350,10 +353,11 @@ export default function Home() {
             ))}
           </div>
 
-          <div className="ml-auto">
+          {/* Save Button */}
+          <div className="w-full md:w-auto md:ml-auto">
             <button 
               onClick={handleShare} 
-              className="btn-primary"
+              className="btn-primary w-full"
               disabled={saving}
             >
               {saving ? "saving..." : "save wall"}
