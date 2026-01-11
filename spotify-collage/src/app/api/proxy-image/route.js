@@ -17,7 +17,10 @@ export async function GET(request) {
     return new NextResponse(buffer, {
       headers: {
         "Content-Type": response.headers.get("Content-Type") || "image/jpeg",
-        "Cache-Control": "public, max-age=31536000",
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+        "Pragma": "no-cache",
+        "Expires": "0",
+        "Vary": "*",
       },
     });
   } catch (error) {
