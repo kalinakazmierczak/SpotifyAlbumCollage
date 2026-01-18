@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const imageUrl = searchParams.get("url");
@@ -9,7 +12,20 @@ export async function GET(request) {
   }
 
   try {
-    const response = await fetch(imageUrl);
+    // Add timestamp to bust any upstream caches
+    const urlWithCacheBust = new URL(imageUrl);
+    
+    const response = await fetch(urlWithCacheBust.toString(), {
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-cache",
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.status}`);
+    }
+    
     const blob = await response.blob();
     const arrayBuffer = await blob.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -21,6 +37,7 @@ export async function GET(request) {
         "Pragma": "no-cache",
         "Expires": "0",
         "Vary": "*",
+        "Surrogate-Control": "no-store",
       },
     });
   } catch (error) {

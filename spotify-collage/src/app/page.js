@@ -1,17 +1,23 @@
 "use client";
 
 import { useSession, signIn, signOut } from "next-auth/react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
+import { useSpotifyData } from "@/hooks/useSpotifyData";
 
 export default function Home() {
-  const { data: session } = useSession();
-  const [topItems, setTopItems] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const { data: session, status } = useSession();
   const [timePeriod, setTimePeriod] = useState("short_term");
   const [contentType, setContentType] = useState("tracks");
   const [gridSize, setGridSize] = useState(9); // 9 = 3x3, 12 = 4x3, 16 = 4x4
   const wallRef = useRef(null);
   const username = session?.user?.name || "you";
+
+  // Use custom hook for data fetching with proper error handling
+  const { topItems, loading, error, refetch, isAuthenticated, isLoading } = useSpotifyData({
+    timePeriod,
+    contentType,
+    gridSize,
+  });
 
   const timePeriodOptions = [
     { value: "short_term", label: "4 weeks" },
@@ -24,41 +30,22 @@ export default function Home() {
     { value: 16, label: "4×4" },
   ];
 
-  useEffect(() => {
-    if (!session?.accessToken) return;
+  // Handle login with force fresh
+  const handleLogin = useCallback(() => {
+    signIn("spotify", { callbackUrl: window.location.origin });
+  }, []);
 
-    setLoading(true);
-    const url = `https://api.spotify.com/v1/me/top/tracks?limit=50&time_range=${timePeriod}`;
+  // Handle logout properly
+  const handleLogout = useCallback(() => {
+    signOut({ callbackUrl: "/" });
+  }, []);
 
-    fetch(url, {
-      headers: {
-        Authorization: `Bearer ${session.accessToken}`,
-      },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (contentType === "albums") {
-          const albumsMap = new Map();
-          for (const track of data.items) {
-            const album = track.album;
-            if (!albumsMap.has(album.id)) {
-              albumsMap.set(album.id, {
-                ...album,
-                trackName: track.name,
-              });
-            }
-          }
-          setTopItems(Array.from(albumsMap.values()).slice(0, gridSize));
-        } else {
-          setTopItems(data.items.slice(0, gridSize));
-        }
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setLoading(false);
-      });
-  }, [session?.accessToken, timePeriod, contentType, gridSize]);
+  // Generate cache-busting image URL
+  const getImageUrl = useCallback((originalUrl, itemId) => {
+    if (!originalUrl) return null;
+    // Add item ID and timestamp to ensure fresh images
+    return `/api/proxy-image?url=${encodeURIComponent(originalUrl)}&id=${itemId}&t=${Date.now()}`;
+  }, []);
 
   // Load image as base64 via proxy
   const loadImage = (url) => {
@@ -218,8 +205,19 @@ export default function Home() {
     return "grid-cols-4";
   };
 
+  // Show loading state while session is being determined
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6">
+        <div className="grain-overlay" />
+        <div className="inline-block w-8 h-8 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
+        <p className="text-sm text-muted mt-4">loading...</p>
+      </div>
+    );
+  }
+
   // Landing page
-  if (!session) {
+  if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6">
         <div className="grain-overlay" />
@@ -265,7 +263,7 @@ export default function Home() {
 
           {/* CTA */}
           <button
-            onClick={() => signIn("spotify")}
+            onClick={handleLogin}
             className="btn-primary"
           >
             connect with spotify
@@ -297,7 +295,7 @@ export default function Home() {
         </div>
 
         <button
-          onClick={() => signOut()}
+          onClick={handleLogout}
           className="text-sm text-muted hover:text-white transition-colors"
         >
           sign out
@@ -353,17 +351,40 @@ export default function Home() {
             ))}
           </div>
 
+          {/* Refresh Button */}
+          <button
+            onClick={refetch}
+            className="chip hover:bg-zinc-700 transition-colors"
+            title="Refresh data"
+            disabled={loading}
+          >
+            ↻ refresh
+          </button>
+
           {/* Save Button */}
           <div className="w-full md:w-auto md:ml-auto">
             <button 
               onClick={handleShare} 
               className="btn-primary w-full"
-              disabled={saving}
+              disabled={saving || loading}
             >
               {saving ? "saving..." : "save wall"}
             </button>
           </div>
         </div>
+
+        {/* Error display */}
+        {error && (
+          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-center">
+            <p className="text-red-400 text-sm">Failed to load data. Please try refreshing or sign in again.</p>
+            <button 
+              onClick={refetch}
+              className="text-xs text-red-300 underline mt-1"
+            >
+              Try again
+            </button>
+          </div>
+        )}
 
         {/* Wall - 1080x1920 (9:16) aspect ratio */}
         <div className="flex justify-center">
@@ -398,10 +419,8 @@ export default function Home() {
                   contentType === "albums"
                     ? item.images?.[0]?.url
                     : item.album?.images?.[0]?.url;
-                // Use proxy URL for images to avoid CORS issues when saving
-                const imageUrl = originalImageUrl 
-                  ? `/api/proxy-image?url=${encodeURIComponent(originalImageUrl)}`
-                  : null;
+                // Use proxy URL for images with cache busting
+                const imageUrl = getImageUrl(originalImageUrl, item.id);
                 const title = item.name;
                 const artist = item.artists?.[0]?.name;
                 const spotifyUrl = item.external_urls?.spotify;
