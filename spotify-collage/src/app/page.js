@@ -216,6 +216,19 @@ export default function Home() {
     );
   }
 
+  // Preview vinyl colors for landing page
+  const previewColors = [
+    "#E91E63", // Pink
+    "#9C27B0", // Purple
+    "#3F51B5", // Indigo
+    "#2196F3", // Blue
+    "#00BCD4", // Cyan
+    "#4CAF50", // Green
+    "#FF9800", // Orange
+    "#F44336", // Red
+    "#1DB954", // Spotify Green
+  ];
+
   // Landing page
   if (!isAuthenticated) {
     return (
@@ -242,17 +255,31 @@ export default function Home() {
           {/* Preview wall */}
           <div className="wall-container p-6 mb-10">
             <div className="grid grid-cols-3 gap-3">
-              {[...Array(9)].map((_, i) => (
+              {previewColors.map((color, i) => (
                 <div
                   key={i}
-                  className="aspect-square rounded-full relative"
+                  className="aspect-square rounded-full relative vinyl-record"
                   style={{
-                    background: "repeating-radial-gradient(circle at center, #1a1a1a 0px, #1a1a1a 1px, #0f0f0f 1px, #0f0f0f 2px)",
-                    opacity: 0.5 + (i % 3) * 0.15,
+                    background: `repeating-radial-gradient(circle at center, #1a1a1a 0px, #1a1a1a 1px, #0a0a0a 1px, #0a0a0a 3px)`,
                   }}
                 >
+                  {/* Colored center (album art area) */}
+                  <div 
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[55%] h-[55%] rounded-full"
+                    style={{ 
+                      background: `linear-gradient(135deg, ${color} 0%, ${color}99 100%)`,
+                      boxShadow: `0 0 20px ${color}40`,
+                    }}
+                  />
                   {/* Center hole */}
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-zinc-900 rounded-full border border-zinc-700" />
+                  {/* Shine effect */}
+                  <div
+                    className="absolute inset-0 rounded-full opacity-20 pointer-events-none"
+                    style={{
+                      background: "linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.1) 50%, transparent 60%)",
+                    }}
+                  />
                 </div>
               ))}
             </div>
