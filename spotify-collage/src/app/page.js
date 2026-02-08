@@ -13,7 +13,7 @@ export default function Home() {
   const username = session?.user?.name || "you";
 
   // Use custom hook for data fetching with proper error handling
-  const { topItems, loading, error, refetch, isAuthenticated, isLoading } = useSpotifyData({
+  const { topItems, loading, error, refetch, insufficientData, isAuthenticated, isLoading } = useSpotifyData({
     timePeriod,
     contentType,
     gridSize,
@@ -439,15 +439,32 @@ export default function Home() {
               <div className="inline-block w-8 h-8 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
               <p className="text-sm text-muted mt-4">loading your wall...</p>
             </div>
+          ) : insufficientData && topItems.length === 0 ? (
+            <div className="py-8 text-center flex-1 flex flex-col items-center justify-center">
+              <div className="w-16 h-16 rounded-full bg-zinc-800 flex items-center justify-center mb-4">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-500">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M8 12h8M12 8v8" />
+                </svg>
+              </div>
+              <p className="text-sm text-white font-medium mb-2">not enough data yet!</p>
+              <p className="text-xs text-muted px-4">keep streaming and come back soon to see your top {contentType}</p>
+            </div>
           ) : (
-            <div className={`grid ${getGridCols()} gap-3 flex-1 content-center`}>
-              {topItems.map((item, index) => {
-                const originalImageUrl =
-                  contentType === "albums"
-                    ? item.images?.[0]?.url
-                    : item.album?.images?.[0]?.url;
-                // Use proxy URL for images with cache busting
-                const imageUrl = getImageUrl(originalImageUrl, item.id);
+            <>
+              {insufficientData && (
+                <div className="mb-3 text-center">
+                  <p className="text-[10px] text-amber-400/80">limited data available • keep streaming!</p>
+                </div>
+              )}
+              <div className={`grid ${getGridCols()} gap-3 flex-1 content-center`}>
+                {topItems.map((item, index) => {
+                  const originalImageUrl =
+                    contentType === "albums"
+                      ? item.images?.[0]?.url
+                      : item.album?.images?.[0]?.url;
+                  // Use proxy URL for images with cache busting
+                  const imageUrl = getImageUrl(originalImageUrl, item.id);
                 const title = item.name;
                 const artist = item.artists?.[0]?.name;
                 const spotifyUrl = item.external_urls?.spotify;
@@ -509,7 +526,8 @@ export default function Home() {
                   </div>
                 );
               })}
-            </div>
+              </div>
+            </>
           )}
 
           {/* Footer inside wall */}

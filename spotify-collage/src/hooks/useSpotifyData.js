@@ -9,6 +9,7 @@ export function useSpotifyData({ timePeriod, contentType, gridSize }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [fetchKey, setFetchKey] = useState(0);
+  const [insufficientData, setInsufficientData] = useState(false);
 
   // Force a refresh of data
   const refetch = useCallback(() => {
@@ -36,6 +37,7 @@ export function useSpotifyData({ timePeriod, contentType, gridSize }) {
     async function fetchData() {
       setLoading(true);
       setError(null);
+      setInsufficientData(false);
 
       try {
         // Add timestamp to prevent caching
@@ -105,7 +107,14 @@ export function useSpotifyData({ timePeriod, contentType, gridSize }) {
     function processData(data) {
       if (!data.items || data.items.length === 0) {
         setTopItems([]);
+        setInsufficientData(true);
         return;
+      }
+
+      // Check if we have enough data for the grid
+      const minRequired = Math.min(gridSize, 9); // At least need data for a 3x3
+      if (data.items.length < minRequired) {
+        setInsufficientData(true);
       }
 
       if (contentType === "albums") {
@@ -119,7 +128,11 @@ export function useSpotifyData({ timePeriod, contentType, gridSize }) {
             });
           }
         }
-        setTopItems(Array.from(albumsMap.values()).slice(0, gridSize));
+        const albums = Array.from(albumsMap.values());
+        if (albums.length < minRequired) {
+          setInsufficientData(true);
+        }
+        setTopItems(albums.slice(0, gridSize));
       } else {
         setTopItems(data.items.slice(0, gridSize));
       }
@@ -137,6 +150,7 @@ export function useSpotifyData({ timePeriod, contentType, gridSize }) {
     loading,
     error,
     refetch,
+    insufficientData,
     isAuthenticated: status === "authenticated",
     isLoading: status === "loading",
   };
