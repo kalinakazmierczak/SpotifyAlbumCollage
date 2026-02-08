@@ -1,47 +1,58 @@
 import { NextResponse } from "next/server";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
+/**
+ * Proxy images from Spotify CDN to avoid CORS issues when drawing to canvas.
+ * Caches responses for 7 days to minimise upstream fetches.
+ */
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const imageUrl = searchParams.get("url");
 
   if (!imageUrl) {
-    return NextResponse.json({ error: "No URL provided" }, { status: 400 });
+    return NextResponse.json({ error: "Missing url parameter" }, { status: 400 });
+  }
+
+  // Only allow Spotify CDN origins
+  try {
+    const parsed = new URL(imageUrl);
+    const allowed = ["i.scdn.co", "mosaic.scdn.co", "seed-mix-image.spotifycdn.com", "image-cdn-fa.spotifycdn.com", "wrapped-images.spotifycdn.com"];
+    if (!allowed.some((h) => parsed.hostname === h || parsed.hostname.endsWith("." + h))) {
+      return NextResponse.json({ error: "Host not allowed" }, { status: 403 });
+    }
+  } catch {
+    return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
   }
 
   try {
-    // Add timestamp to bust any upstream caches
-    const urlWithCacheBust = new URL(imageUrl);
-    
-    const response = await fetch(urlWithCacheBust.toString(), {
-      cache: "no-store",
+    const upstream = await fetch(imageUrl, {
       headers: {
-        "Cache-Control": "no-cache",
+        Accept: "image/*",
+        "User-Agent": "SpindleApp/1.0",
       },
+      // Allow Next.js to cache at the fetch level
+      next: { revalidate: 86400 },
     });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch image: ${response.status}`);
+
+    if (!upstream.ok) {
+      return NextResponse.json(
+        { error: `Upstream ${upstream.status}` },
+        { status: upstream.statusText === "Not Found" ? 404 : 502 }
+      );
     }
-    
-    const blob = await response.blob();
-    const arrayBuffer = await blob.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+
+    const contentType = upstream.headers.get("content-type") || "image/jpeg";
+    const buffer = await upstream.arrayBuffer();
 
     return new NextResponse(buffer, {
+      status: 200,
       headers: {
-        "Content-Type": response.headers.get("Content-Type") || "image/jpeg",
-        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
-        "Pragma": "no-cache",
-        "Expires": "0",
-        "Vary": "*",
-        "Surrogate-Control": "no-store",
+        "Content-Type": contentType,
+        "Cache-Control": "public, max-age=604800, stale-while-revalidate=86400",
+        "Access-Control-Allow-Origin": "*",
       },
     });
-  } catch (error) {
-    console.error("Proxy error:", error);
-    return NextResponse.json({ error: "Failed to fetch image" }, { status: 500 });
+  } catch (err) {
+    console.error("[proxy-image] Error:", err.message);
+    return NextResponse.json({ error: "Failed to fetch image" }, { status: 502 });
   }
 }

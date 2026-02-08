@@ -1,41 +1,56 @@
 import NextAuth from "next-auth";
 import SpotifyProvider from "next-auth/providers/spotify";
 
-const SPOTIFY_REFRESH_TOKEN_URL = "https://accounts.spotify.com/api/token";
+const SPOTIFY_SCOPES = [
+  "user-read-email",
+  "user-read-private",
+  "user-top-read",
+].join(" ");
 
+const SPOTIFY_AUTH_URL = `https://accounts.spotify.com/authorize?scope=${encodeURIComponent(SPOTIFY_SCOPES)}`;
+
+/**
+ * Refresh a Spotify access token using the refresh_token grant.
+ * Returns the updated token object, or marks it with an error.
+ */
 async function refreshAccessToken(token) {
   try {
-    const basicAuth = Buffer.from(
+    const params = new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: token.refreshToken,
+    });
+
+    const basic = Buffer.from(
       `${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`
     ).toString("base64");
 
-    const response = await fetch(SPOTIFY_REFRESH_TOKEN_URL, {
+    const res = await fetch("https://accounts.spotify.com/api/token", {
       method: "POST",
       headers: {
-        Authorization: `Basic ${basicAuth}`,
         "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Basic ${basic}`,
       },
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: token.refreshToken,
-      }),
+      body: params.toString(),
     });
 
-    const refreshedTokens = await response.json();
+    const data = await res.json();
 
-    if (!response.ok) {
-      throw refreshedTokens;
+    if (!res.ok) {
+      console.error("[NextAuth] Token refresh failed:", data);
+      throw new Error(data.error || "refresh_failed");
     }
+
+    console.log("[NextAuth] Token refreshed successfully");
 
     return {
       ...token,
-      accessToken: refreshedTokens.access_token,
-      accessTokenExpires: Date.now() + refreshedTokens.expires_in * 1000,
-      // Fall back to old refresh token if a new one wasn't provided
-      refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
+      accessToken: data.access_token,
+      accessTokenExpires: Date.now() + data.expires_in * 1000,
+      // Spotify may or may not return a new refresh token
+      refreshToken: data.refresh_token ?? token.refreshToken,
     };
-  } catch (error) {
-    console.error("Error refreshing access token:", error);
+  } catch (err) {
+    console.error("[NextAuth] RefreshAccessTokenError:", err.message);
     return {
       ...token,
       error: "RefreshAccessTokenError",
@@ -43,62 +58,109 @@ async function refreshAccessToken(token) {
   }
 }
 
-const handler = NextAuth({
+const authOptions = {
   providers: [
     SpotifyProvider({
       clientId: process.env.SPOTIFY_CLIENT_ID,
       clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
-      authorization: {
-        params: {
-          scope: "user-top-read",
-          show_dialog: true, // Always show login dialog to prevent stale sessions
-        },
-      },
+      authorization: SPOTIFY_AUTH_URL,
     }),
   ],
+
+  secret: process.env.NEXTAUTH_SECRET,
+
+  // Fix cookie issues: cookies must work for both localhost and 127.0.0.1
+  cookies: {
+    sessionToken: {
+      name: "next-auth.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: false,
+      },
+    },
+    callbackUrl: {
+      name: "next-auth.callback-url",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: false,
+      },
+    },
+    csrfToken: {
+      name: "next-auth.csrf-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: false,
+      },
+    },
+    pkceCodeVerifier: {
+      name: "next-auth.pkce.code_verifier",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: false,
+        maxAge: 60 * 15, // 15 minutes
+      },
+    },
+    state: {
+      name: "next-auth.state",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: false,
+        maxAge: 60 * 15, // 15 minutes
+      },
+    },
+  },
+
   callbacks: {
     async jwt({ token, account }) {
-      // Initial sign in
+      // Initial sign-in — persist tokens from the OAuth callback
       if (account) {
-        console.log("[NextAuth] Initial sign in - account received:", {
-          hasAccessToken: !!account.access_token,
-          hasRefreshToken: !!account.refresh_token,
-          expiresAt: account.expires_at,
-        });
         return {
+          ...token,
           accessToken: account.access_token,
-          accessTokenExpires: account.expires_at * 1000,
           refreshToken: account.refresh_token,
-          user: token,
+          accessTokenExpires: account.expires_at * 1000,
         };
       }
 
-      // Return previous token if it hasn't expired yet
-      if (Date.now() < token.accessTokenExpires) {
+      // Token still valid — return as-is
+      if (Date.now() < (token.accessTokenExpires ?? 0) - 60_000) {
         return token;
       }
 
-      // Access token has expired, try to refresh it
-      console.log("[NextAuth] Token expired, refreshing...");
-      return await refreshAccessToken(token);
+      // Token expired — attempt refresh
+      return refreshAccessToken(token);
     },
+
     async session({ session, token }) {
-      console.log("[NextAuth] Building session:", {
-        hasAccessToken: !!token.accessToken,
-        hasError: !!token.error,
-      });
       session.accessToken = token.accessToken;
       session.error = token.error;
+      session.user.id = token.sub;
       return session;
     },
   },
-  // Force session to be checked on every request
+
+  pages: {
+    signIn: "/",
+    error: "/",
+  },
+
+  // Use JWT strategy (no database needed)
   session: {
     strategy: "jwt",
-    maxAge: 60 * 60, // 1 hour - forces re-auth more frequently
+    maxAge: 60 * 60, // 1 hour
   },
-  // Enable debug mode in development
-  debug: process.env.NODE_ENV === "development",
-});
+};
+
+const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };

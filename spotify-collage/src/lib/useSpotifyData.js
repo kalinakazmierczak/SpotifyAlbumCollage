@@ -3,19 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession, signOut } from "next-auth/react";
 
-/**
- * Custom hook that fetches top tracks/albums from Spotify.
- *
- * Features:
- *  - Waits for session before fetching
- *  - 401 → auto token refresh → retry (once)
- *  - Abort-safe cleanup — no stale state writes
- *  - In-memory cache to avoid refetching identical queriess
- *  - Insufficient data detection
- *  - Manual refetch
- */
-
-// Simple in-memory cache: "token:timePeriod" → { data, timestamp }
+// In-memory cache: "token:timePeriod" → { data, timestamp }
 const queryCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
@@ -23,7 +11,7 @@ function getCacheKey(token, timePeriod) {
   return `${token.slice(0, 8)}:${timePeriod}`;
 }
 
-function useSpotifyData({ timePeriod, contentType, gridSize }) {
+export default function useSpotifyData({ timePeriod, contentType, gridSize }) {
   const { data: session, status, update } = useSession();
   const [topItems, setTopItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,7 +22,6 @@ function useSpotifyData({ timePeriod, contentType, gridSize }) {
   const abortRef = useRef(null);
 
   const refetch = useCallback(() => {
-    // Bust cache for current query on manual refresh
     if (session?.accessToken) {
       queryCache.delete(getCacheKey(session.accessToken, timePeriod));
     }
@@ -82,7 +69,6 @@ function useSpotifyData({ timePeriod, contentType, gridSize }) {
             signal: controller.signal,
           });
 
-          // One retry with refreshed token
           if (res.status === 401) {
             const refreshed = await update();
             if (!refreshed?.accessToken) {
@@ -101,7 +87,6 @@ function useSpotifyData({ timePeriod, contentType, gridSize }) {
           const data = await res.json();
           rawItems = data.items ?? [];
 
-          // Cache the raw response
           queryCache.set(getCacheKey(token, timePeriod), {
             data: rawItems,
             timestamp: Date.now(),
@@ -110,7 +95,6 @@ function useSpotifyData({ timePeriod, contentType, gridSize }) {
 
         if (cancelled) return;
 
-        // Process
         if (rawItems.length === 0) {
           setTopItems([]);
           setInsufficientData(true);
@@ -161,6 +145,3 @@ function useSpotifyData({ timePeriod, contentType, gridSize }) {
     isSessionLoading: status === "loading",
   };
 }
-
-export { useSpotifyData };
-export default useSpotifyData;
